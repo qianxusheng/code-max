@@ -10,7 +10,7 @@ import {
   writeFileTool,
   editTool,
   bashTool,
-} from "./handlers.js";
+} from "../tools/handlers.js";
 
 // A throwaway directory for the mutating tools, so tests never touch the repo.
 let dir: string;
