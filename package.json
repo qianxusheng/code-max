@@ -7,7 +7,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "start": "npx tsx src/cli.ts"
+    "start": "npx tsx src/cli/cli.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.65.0",
