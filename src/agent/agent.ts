@@ -3,10 +3,7 @@ import { call as defaultCall, toString } from "../model/call.js";
 import type { CallParams } from "../model/call.js";
 import { get, specs } from "../tools/index.js";
 import { createPolicy, denyApprove, type Mode, type Approve } from "../policy/permissions.js";
-
-const SYSTEM =
-  "You are a coding agent. Help the user with software engineering tasks. " +
-  "Use the available tools to inspect files before answering questions about them.";
+import { SYSTEM_PROMPT } from "../prompts/index.js";
 
 const MAX_STEPS = 10;
 
@@ -15,6 +12,8 @@ export type Model = (params: CallParams) => Promise<Anthropic.Message>;
 
 export interface AgentOptions {
   model?: Model;
+  /** System prompt for the session (default: the bundled SYSTEM.md). */
+  system?: string;
   /** Permission profile for this session (default: "ask"). */
   mode?: Mode;
   /** Interactive approval callback (default: deny anything that needs asking). */
@@ -27,6 +26,7 @@ export interface AgentOptions {
  */
 export function createAgent({
   model = defaultCall,
+  system = SYSTEM_PROMPT,
   mode = "ask",
   approve = denyApprove,
 }: AgentOptions = {}) {
@@ -39,7 +39,7 @@ export function createAgent({
     messages.push({ role: "user", content: userInput });
 
     for (let step = 0; step < MAX_STEPS; step++) {
-      const response = await model({ system: SYSTEM, messages, tools: specs() });
+      const response = await model({ system, messages, tools: specs() });
 
       // Record the assistant turn verbatim — keeps tool_use blocks intact.
       messages.push({ role: "assistant", content: response.content });
