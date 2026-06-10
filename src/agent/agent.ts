@@ -2,6 +2,7 @@ import type Anthropic from "@anthropic-ai/sdk";
 import { call as defaultCall, toString } from "../model/call.js";
 import type { CallParams } from "../model/call.js";
 import { get, specs } from "../tools/index.js";
+import { createPolicy, denyApprove, type Mode, type Approve } from "../policy/permissions.js";
 
 const SYSTEM =
   "You are a coding agent. Help the user with software engineering tasks. " +
@@ -14,13 +15,23 @@ export type Model = (params: CallParams) => Promise<Anthropic.Message>;
 
 export interface AgentOptions {
   model?: Model;
+  /** Permission profile for this session (default: "ask"). */
+  mode?: Mode;
+  /** Interactive approval callback (default: deny anything that needs asking). */
+  approve?: Approve;
 }
 
 /**
  * A session: owns its own conversation and runs the ReAct loop per turn.
  * UI-agnostic — no readline, no prompts. The CLI drives it via `send`.
  */
-export function createAgent({ model = defaultCall }: AgentOptions = {}) {
+export function createAgent({
+  model = defaultCall,
+  mode = "ask",
+  approve = denyApprove,
+}: AgentOptions = {}) {
+  const policy = createPolicy(mode);
+
   // Persists across turns — the agent's in-session memory.
   const messages: Anthropic.MessageParam[] = [];
 
@@ -46,12 +57,33 @@ export function createAgent({ model = defaultCall }: AgentOptions = {}) {
         console.log(`  [tool] ${block.name}(${JSON.stringify(block.input)})`);
         const tool = get(block.name);
         let output: string;
-        try {
-          output = tool
-            ? await tool.run(block.input)
-            : `Error: unknown tool "${block.name}"`;
-        } catch (err) {
-          output = `Error: ${(err as Error).message}`;
+        if (!tool) {
+          output = `Error: unknown tool "${block.name}"`;
+        } else {
+          const decision = policy.decide({ name: tool.spec.name, kind: tool.kind });
+          if (decision === "deny") {
+            output = `Denied: "${tool.spec.name}" is not permitted in "${mode}" mode.`;
+          } else {
+            let allow = true;
+            if (decision === "ask") {
+              const res = await approve({
+                name: tool.spec.name,
+                kind: tool.kind,
+                input: block.input,
+              });
+              if (res.allow && res.remember) policy.remember(tool.spec.name);
+              allow = res.allow;
+            }
+            if (!allow) {
+              output = "Denied by user.";
+            } else {
+              try {
+                output = await tool.run(block.input);
+              } catch (err) {
+                output = `Error: ${(err as Error).message}`;
+              }
+            }
+          }
         }
 
         results.push({

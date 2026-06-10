@@ -3,6 +3,7 @@ import { join, dirname } from "node:path";
 import { exec } from "node:child_process";
 import { promisify } from "node:util";
 import type { Tool } from "./registry.js";
+import { safePath } from "../policy/safe-path.js";
 
 // All tool implementations live here while there are only a few. When this file
 // grows further, split by category: fs_handlers.ts (read/write/edit/list/grep/
@@ -57,6 +58,7 @@ function globToRegExp(glob: string): RegExp {
 // ---------------------------------------------------------------------------
 
 export const readFileTool: Tool = {
+  kind: "read",
   spec: {
     name: "read_file",
     description: "Read a UTF-8 text file from the project and return its contents.",
@@ -71,11 +73,14 @@ export const readFileTool: Tool = {
   async run(input) {
     const path = (input as { path?: unknown }).path;
     if (typeof path !== "string") return 'Error: "path" must be a string.';
-    return await readFile(path, "utf8");
+    const full = safePath(path);
+    if (!full) return `Error: "${path}" is outside the project root.`;
+    return await readFile(full, "utf8");
   },
 };
 
 export const listDirTool: Tool = {
+  kind: "read",
   spec: {
     name: "list_dir",
     description: "List the entries (files and subdirectories) of a directory.",
@@ -90,12 +95,15 @@ export const listDirTool: Tool = {
   async run(input) {
     const path = (input as { path?: unknown }).path;
     if (typeof path !== "string") return 'Error: "path" must be a string.';
-    const entries = await readdir(path, { withFileTypes: true });
+    const full = safePath(path);
+    if (!full) return `Error: "${path}" is outside the project root.`;
+    const entries = await readdir(full, { withFileTypes: true });
     return entries.map((e) => (e.isDirectory() ? `${e.name}/` : e.name)).join("\n");
   },
 };
 
 export const grepTool: Tool = {
+  kind: "read",
   spec: {
     name: "grep",
     description:
@@ -116,6 +124,7 @@ export const grepTool: Tool = {
     const { pattern, path } = input as { pattern?: unknown; path?: unknown };
     if (typeof pattern !== "string") return 'Error: "pattern" must be a string.';
     const root = typeof path === "string" ? path : ".";
+    if (!safePath(root)) return `Error: "${root}" is outside the project root.`;
     let regex: RegExp;
     try {
       regex = new RegExp(pattern);
@@ -142,6 +151,7 @@ export const grepTool: Tool = {
 };
 
 export const globTool: Tool = {
+  kind: "read",
   spec: {
     name: "glob",
     description:
@@ -172,6 +182,7 @@ export const globTool: Tool = {
 // ---------------------------------------------------------------------------
 
 export const writeFileTool: Tool = {
+  kind: "edit",
   spec: {
     name: "write_file",
     description: "Create or overwrite a file with the given contents.",
@@ -188,13 +199,16 @@ export const writeFileTool: Tool = {
     const { path, content } = input as { path?: unknown; content?: unknown };
     if (typeof path !== "string") return 'Error: "path" must be a string.';
     if (typeof content !== "string") return 'Error: "content" must be a string.';
-    await mkdir(dirname(path), { recursive: true });
-    await writeFile(path, content, "utf8");
+    const full = safePath(path);
+    if (!full) return `Error: "${path}" is outside the project root.`;
+    await mkdir(dirname(full), { recursive: true });
+    await writeFile(full, content, "utf8");
     return `Wrote ${content.length} bytes to ${path}`;
   },
 };
 
 export const editTool: Tool = {
+  kind: "edit",
   spec: {
     name: "edit",
     description:
@@ -219,9 +233,11 @@ export const editTool: Tool = {
     if (typeof old_string !== "string" || typeof new_string !== "string") {
       return 'Error: "old_string" and "new_string" must be strings.';
     }
+    const full = safePath(path);
+    if (!full) return `Error: "${path}" is outside the project root.`;
     let content: string;
     try {
-      content = await readFile(path, "utf8");
+      content = await readFile(full, "utf8");
     } catch (e) {
       return `Error: ${(e as Error).message}`;
     }
@@ -230,12 +246,13 @@ export const editTool: Tool = {
     if (occurrences > 1) {
       return `Error: old_string appears ${occurrences} times; add context to make it unique.`;
     }
-    await writeFile(path, content.replace(old_string, new_string), "utf8");
+    await writeFile(full, content.replace(old_string, new_string), "utf8");
     return `Edited ${path}`;
   },
 };
 
 export const bashTool: Tool = {
+  kind: "exec",
   spec: {
     name: "bash",
     description:
