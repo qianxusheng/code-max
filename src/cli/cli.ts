@@ -3,6 +3,21 @@ import { stdin, stdout } from "node:process";
 import { createAgent } from "../agent/agent.js";
 import type { Approve, Mode } from "../policy/permissions.js";
 
+/** Render a tool call's input as a short, human-readable line for the prompt. */
+function describe(input: unknown): string {
+  const o = (input ?? {}) as Record<string, unknown>;
+  if (typeof o.command === "string") return o.command; // bash
+  if (typeof o.path === "string") {
+    // write_file carries the whole body — show size, not the content.
+    return typeof o.content === "string"
+      ? `${o.path} (${o.content.length} bytes)`
+      : o.path;
+  }
+  if (typeof o.pattern === "string") return o.pattern; // grep / glob
+  const json = JSON.stringify(input);
+  return json.length > 80 ? json.slice(0, 80) + "…" : json;
+}
+
 /** The REPL: read a line, run the agent, print the reply, repeat. */
 async function main() {
   const rl = readline.createInterface({ input: stdin, output: stdout });
@@ -22,7 +37,7 @@ async function main() {
   // Interactive approval for tools the policy flags as "ask".
   const approve: Approve = async ({ name, kind, input }) => {
     const answer = (
-      await rl.question(`  ⚠ ${name} (${kind}) ${JSON.stringify(input)} — [1]yes / [2]always / [3]no? `)
+      await rl.question(`  ⚠ ${name} (${kind}) ${describe(input)} — [1]yes / [2]always / [3]no? `)
     ).trim();
     switch (answer) {
       case "1":
