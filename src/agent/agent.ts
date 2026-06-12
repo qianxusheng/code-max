@@ -1,15 +1,12 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { call as defaultCall, toString } from "../model/call.js";
-import type { CallParams } from "../model/call.js";
+import type { Model } from "../model/call.js";
 import { get, specs } from "../tools/index.js";
 import { createPolicy, denyApprove, type Mode, type Approve } from "../policy/permissions.js";
 import { SYSTEM_PROMPT } from "../prompts/index.js";
 import { truncateMiddle, MAX_TOOL_OUTPUT_CHARS } from "../context/truncate.js";
 
 const MAX_STEPS = 10;
-
-/** The model-call shape, injectable so tests can pass a fake instead of the network. */
-export type Model = (params: CallParams) => Promise<Anthropic.Message>;
 
 export interface AgentOptions {
   model?: Model;

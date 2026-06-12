@@ -16,3 +16,6 @@ function toolList(): string {
 
 /** The system prompt, with the live tool list injected in place of {{TOOLS}}. */
 export const SYSTEM_PROMPT = template.replace("{{TOOLS}}", toolList());
+
+/** The compaction prompt — summarizes old turns into a handoff summary. */
+export const COMPACTION_PROMPT = await readFile(join(here, "COMPACTION.md"), "utf8");
