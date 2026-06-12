@@ -5,6 +5,7 @@ import { get, specs } from "../tools/index.js";
 import { createPolicy, denyApprove, type Mode, type Approve } from "../policy/permissions.js";
 import { SYSTEM_PROMPT } from "../prompts/index.js";
 import { truncateMiddle, MAX_TOOL_OUTPUT_CHARS } from "../context/truncate.js";
+import { callWithEviction } from "../context/fallback/evict.js";
 
 const MAX_STEPS = 10;
 
@@ -37,7 +38,8 @@ export function createAgent({
     messages.push({ role: "user", content: userInput });
 
     for (let step = 0; step < MAX_STEPS; step++) {
-      const response = await model({ system, messages, tools: specs() });
+      // On a context-overflow rejection, shed the oldest turn and retry.
+      const response = await callWithEviction(model, { system, messages, tools: specs() });
 
       // Record the assistant turn verbatim — keeps tool_use blocks intact.
       messages.push({ role: "assistant", content: response.content });
