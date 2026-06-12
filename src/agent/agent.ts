@@ -4,6 +4,7 @@ import type { CallParams } from "../model/call.js";
 import { get, specs } from "../tools/index.js";
 import { createPolicy, denyApprove, type Mode, type Approve } from "../policy/permissions.js";
 import { SYSTEM_PROMPT } from "../prompts/index.js";
+import { truncateMiddle, MAX_TOOL_OUTPUT_CHARS } from "../context/truncate.js";
 
 const MAX_STEPS = 10;
 
@@ -89,7 +90,8 @@ export function createAgent({
         results.push({
           type: "tool_result",
           tool_use_id: block.id, // pair the result to the exact call
-          content: output,
+          // Bound each output at ingestion so one big result can't blow context.
+          content: truncateMiddle(output, MAX_TOOL_OUTPUT_CHARS),
         });
       }
 
