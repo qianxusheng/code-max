@@ -12,8 +12,6 @@ import {
   MAX_TOOL_OUTPUT_CHARS,
 } from "../context/index.js";
 
-const MAX_STEPS = 10;
-
 export interface AgentOptions {
   model?: Model;
   /** System prompt for the session (default: the bundled SYSTEM.md). */
@@ -43,7 +41,7 @@ export function createAgent({
   async function send(userInput: string): Promise<string> {
     messages.push({ role: "user", content: userInput });
 
-    for (let step = 0; step < MAX_STEPS; step++) {
+    while (true) {
       // Proactively keep the conversation under budget before sampling.
       const managed = await manageContext(messages, model, budget);
       if (managed !== messages) messages.splice(0, messages.length, ...managed);
@@ -107,8 +105,6 @@ export function createAgent({
       // Feed observations back as one user message, then loop.
       messages.push({ role: "user", content: results });
     }
-
-    throw new Error(`Gave up after ${MAX_STEPS} steps`);
   }
 
   return { send };
