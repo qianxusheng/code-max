@@ -1,7 +1,7 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { client } from "./client.js";
 
-const MODEL = "deepseek-v4-pro";
+export const MODEL = "deepseek-v4-pro";
 const MAX_TOKENS = 16000;
 
 /** The inputs a turn needs: the conversation, the system prompt, the tools. */

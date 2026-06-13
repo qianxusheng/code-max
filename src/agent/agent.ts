@@ -1,11 +1,16 @@
 import type Anthropic from "@anthropic-ai/sdk";
-import { call as defaultCall, toString } from "../model/call.js";
+import { call as defaultCall, toString, MODEL } from "../model/call.js";
 import type { Model } from "../model/call.js";
 import { get, specs } from "../tools/index.js";
 import { createPolicy, denyApprove, type Mode, type Approve } from "../policy/permissions.js";
 import { SYSTEM_PROMPT } from "../prompts/index.js";
-import { truncateMiddle, MAX_TOOL_OUTPUT_CHARS } from "../context/truncate.js";
-import { callWithEviction } from "../context/fallback/evict.js";
+import {
+  manageContext,
+  callWithEviction,
+  budgetFor,
+  truncateMiddle,
+  MAX_TOOL_OUTPUT_CHARS,
+} from "../context/index.js";
 
 const MAX_STEPS = 10;
 
@@ -30,6 +35,7 @@ export function createAgent({
   approve = denyApprove,
 }: AgentOptions = {}) {
   const policy = createPolicy(mode);
+  const budget = budgetFor(MODEL);
 
   // Persists across turns — the agent's in-session memory.
   const messages: Anthropic.MessageParam[] = [];
@@ -38,6 +44,10 @@ export function createAgent({
     messages.push({ role: "user", content: userInput });
 
     for (let step = 0; step < MAX_STEPS; step++) {
+      // Proactively keep the conversation under budget before sampling.
+      const managed = await manageContext(messages, model, budget);
+      if (managed !== messages) messages.splice(0, messages.length, ...managed);
+
       // On a context-overflow rejection, shed the oldest turn and retry.
       const response = await callWithEviction(model, { system, messages, tools: specs() });
 
