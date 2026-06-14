@@ -1,5 +1,5 @@
 import type Anthropic from "@anthropic-ai/sdk";
-import type { CallParams, Model } from "../../model/call.js";
+import type { CallParams, LlmCall } from "../../model/call.js";
 
 /**
  * A real user turn (typed text), not a tool_result-carrying user message — the
@@ -44,12 +44,12 @@ export function isOverflowError(err: unknown): boolean {
  * place so the caller's conversation reflects the eviction.
  */
 export async function callWithEviction(
-  model: Model,
+  call: LlmCall,
   params: CallParams,
 ): Promise<Anthropic.Message> {
   while (true) {
     try {
-      return await model(params);
+      return await call(params);
     } catch (err) {
       if (!isOverflowError(err)) throw err;
       const evicted = evictOldest(params.messages);

@@ -1,5 +1,5 @@
 import type Anthropic from "@anthropic-ai/sdk";
-import type { Model } from "../model/call.js";
+import type { LlmCall } from "../model/call.js";
 import { estimateTokens, pressure, type Budget } from "./budget.js";
 import { trim } from "./fallback/trim.js";
 import { compact } from "./fallback/compact.js";
@@ -35,13 +35,13 @@ export class ContextManager {
    *   - soft → compact (summarize older turns, graceful),
    *   - ok   → leave as-is.
    */
-  async manage(model: Model): Promise<void> {
+  async manage(call: LlmCall): Promise<void> {
     switch (pressure(this.tokens(), this.budget)) {
       case "hard":
         this.replace(trim(this.items, this.budget));
         break;
       case "soft":
-        this.replace(await compact(this.items, model));
+        this.replace(await compact(this.items, call));
         break;
     }
   }

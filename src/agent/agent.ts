@@ -1,6 +1,6 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { call as defaultCall, toString, MODEL } from "../model/call.js";
-import type { Model } from "../model/call.js";
+import type { LlmCall } from "../model/call.js";
 import { get, specs } from "../tools/index.js";
 import { createPolicy, denyApprove, type Mode, type Approve } from "../policy/permissions.js";
 import { SYSTEM_PROMPT } from "../prompts/index.js";
@@ -13,7 +13,7 @@ import {
 } from "../context/index.js";
 
 export interface AgentOptions {
-  model?: Model;
+  call?: LlmCall;
   /** System prompt for the session (default: the bundled SYSTEM.md). */
   system?: string;
   /** Permission profile for this session (default: "ask"). */
@@ -27,7 +27,7 @@ export interface AgentOptions {
  * UI-agnostic — no readline, no prompts. The CLI drives it via `send`.
  */
 export function createAgent({
-  model = defaultCall,
+  call = defaultCall,
   system = SYSTEM_PROMPT,
   mode = "ask",
   approve = denyApprove,
@@ -40,10 +40,10 @@ export function createAgent({
 
     while (true) {
       // Proactively keep the conversation under budget before sampling.
-      await history.manage(model);
+      await history.manage(call);
 
       // On a context-overflow rejection, shed the oldest turn and retry.
-      const response = await callWithEviction(model, {
+      const response = await callWithEviction(call, {
         system,
         messages: history.forPrompt(),
         tools: specs(),

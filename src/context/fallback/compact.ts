@@ -1,5 +1,5 @@
 import type Anthropic from "@anthropic-ai/sdk";
-import { toString, type Model } from "../../model/call.js";
+import { toString, type LlmCall } from "../../model/call.js";
 import { COMPACTION_PROMPT } from "../../prompts/index.js";
 
 // How many recent turns to keep verbatim; everything older is summarized.
@@ -44,7 +44,7 @@ function transcribe(messages: Anthropic.MessageParam[]): string {
  */
 export async function compact(
   messages: Anthropic.MessageParam[],
-  model: Model,
+  call: LlmCall,
 ): Promise<Anthropic.MessageParam[]> {
   const boundaries: number[] = [];
   messages.forEach((m, i) => {
@@ -57,7 +57,7 @@ export async function compact(
   const older = messages.slice(0, splitAt);
   const recent = messages.slice(splitAt);
 
-  const response = await model({
+  const response = await call({
     system: COMPACTION_PROMPT,
     messages: [{ role: "user", content: transcribe(older) }],
   });

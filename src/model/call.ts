@@ -11,8 +11,8 @@ export interface CallParams {
   tools?: Anthropic.Tool[];
 }
 
-/** The model-call shape — injectable so tests/agents can pass a fake. */
-export type Model = (params: CallParams) => Promise<Anthropic.Message>;
+/** The LLM-call shape — injectable so tests/agents can pass a fake. */
+export type LlmCall = (params: CallParams) => Promise<Anthropic.Message>;
 
 /** Wraps the singleton client into one Messages API call; returns the full Message. */
 export async function call({
