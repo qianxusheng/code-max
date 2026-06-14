@@ -5,7 +5,7 @@ import { get, specs } from "../tools/index.js";
 import { createPolicy, denyApprove, type Mode, type Approve } from "../policy/permissions.js";
 import { SYSTEM_PROMPT } from "../prompts/index.js";
 import {
-  manageContext,
+  ContextManager,
   callWithEviction,
   budgetFor,
   truncateMiddle,
@@ -33,24 +33,24 @@ export function createAgent({
   approve = denyApprove,
 }: AgentOptions = {}) {
   const policy = createPolicy(mode);
-  const budget = budgetFor(MODEL);
-
-  // Persists across turns — the agent's in-session memory.
-  const messages: Anthropic.MessageParam[] = [];
+  const history = new ContextManager(budgetFor(MODEL));
 
   async function send(userInput: string): Promise<string> {
-    messages.push({ role: "user", content: userInput });
+    history.record({ role: "user", content: userInput });
 
     while (true) {
       // Proactively keep the conversation under budget before sampling.
-      const managed = await manageContext(messages, model, budget);
-      if (managed !== messages) messages.splice(0, messages.length, ...managed);
+      await history.manage(model);
 
       // On a context-overflow rejection, shed the oldest turn and retry.
-      const response = await callWithEviction(model, { system, messages, tools: specs() });
+      const response = await callWithEviction(model, {
+        system,
+        messages: history.forPrompt(),
+        tools: specs(),
+      });
 
       // Record the assistant turn verbatim — keeps tool_use blocks intact.
-      messages.push({ role: "assistant", content: response.content });
+      history.record({ role: "assistant", content: response.content });
 
       // No tool calls → the model is done.
       if (response.stop_reason !== "tool_use") {
@@ -103,7 +103,7 @@ export function createAgent({
       }
 
       // Feed observations back as one user message, then loop.
-      messages.push({ role: "user", content: results });
+      history.record({ role: "user", content: results });
     }
   }
 
