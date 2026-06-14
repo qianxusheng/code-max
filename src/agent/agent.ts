@@ -5,14 +5,13 @@ import { get, specs } from "../tools/index.js";
 import { createPolicy, denyApprove, type Mode, type Approve } from "../policy/permissions.js";
 import { SYSTEM_PROMPT } from "../prompts/index.js";
 import {
-  ContextManager,
   callWithEviction,
-  budgetFor,
   truncateMiddle,
   MAX_TOOL_OUTPUT_CHARS,
 } from "../context/index.js";
+import { Session } from "../session/session.js";
 
-export interface AgentOptions {
+export interface AgentParams {
   call?: LlmCall;
   /** System prompt for the session (default: the bundled SYSTEM.md). */
   system?: string;
@@ -31,26 +30,27 @@ export function createAgent({
   system = SYSTEM_PROMPT,
   mode = "ask",
   approve = denyApprove,
-}: AgentOptions = {}) {
+}: AgentParams = {}) {
   const policy = createPolicy(mode);
-  const history = new ContextManager(budgetFor(MODEL));
+  const session = new Session({ model: MODEL, mode });
 
   async function send(userInput: string): Promise<string> {
-    history.record({ role: "user", content: userInput });
+    session.record({ role: "user", content: userInput });
 
     while (true) {
       // Proactively keep the conversation under budget before sampling.
-      await history.manage(call);
+      await session.manage(call);
 
       // On a context-overflow rejection, shed the oldest turn and retry.
       const response = await callWithEviction(call, {
         system,
-        messages: history.forPrompt(),
+        messages: session.forPrompt(),
         tools: specs(),
       });
+      session.state.lastUsage = response.usage;
 
       // Record the assistant turn verbatim — keeps tool_use blocks intact.
-      history.record({ role: "assistant", content: response.content });
+      session.record({ role: "assistant", content: response.content });
 
       // No tool calls → the model is done.
       if (response.stop_reason !== "tool_use") {
@@ -103,7 +103,7 @@ export function createAgent({
       }
 
       // Feed observations back as one user message, then loop.
-      history.record({ role: "user", content: results });
+      session.record({ role: "user", content: results });
     }
   }
 
