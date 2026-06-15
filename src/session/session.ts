@@ -1,6 +1,6 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { randomUUID } from "node:crypto";
-import type { Mode } from "../policy/permissions.js";
+import { createPolicy, type Mode } from "../policy/permissions.js";
 import type { LlmCall } from "../model/call.js";
 import { ContextManager, budgetFor } from "../context/index.js";
 
@@ -13,11 +13,6 @@ export interface SessionMeta {
   cwd: string;
 }
 
-/** Live, mutable runtime state — recomputed each session, mostly volatile. */
-export interface SessionState {
-  mode: Mode;
-  lastUsage?: Anthropic.Message["usage"];
-}
 
 export interface SessionParams {
   model: string;
@@ -30,7 +25,10 @@ export interface SessionParams {
  */
 export class Session {
   readonly meta: SessionMeta;
-  readonly state: SessionState;
+  readonly mode: Mode;
+  lastUsage?: Anthropic.Message["usage"];
+  /** Per-session permission policy (mode baseline + its "remembered" allowlist). */
+  readonly policy: ReturnType<typeof createPolicy>;
   private readonly history: ContextManager;
 
   constructor({ model, mode }: SessionParams) {
@@ -42,7 +40,8 @@ export class Session {
       updatedAt: now,
       cwd: process.cwd(),
     };
-    this.state = { mode };
+    this.mode = mode;
+    this.policy = createPolicy(mode);
     this.history = new ContextManager(budgetFor(model));
   }
 

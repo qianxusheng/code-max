@@ -1,6 +1,8 @@
 import * as readline from "node:readline/promises";
 import { stdin, stdout } from "node:process";
 import { createAgent } from "../agent/agent.js";
+import { Session } from "../session/session.js";
+import { MODEL } from "../model/call.js";
 import type { Approve, Mode } from "../policy/permissions.js";
 
 /** Render a tool call's input as a short, human-readable line for the prompt. */
@@ -53,7 +55,8 @@ async function main() {
     }
   };
 
-  const agent = createAgent({ mode, approve });
+  const agent = createAgent({ approve });
+  const session = new Session({ model: MODEL, mode });
   console.log("Type a message, or /exit to quit.\n");
 
   while (true) {
@@ -62,7 +65,7 @@ async function main() {
     if (!line) continue;
 
     try {
-      console.log("\n" + (await agent.send(line)) + "\n");
+      console.log("\n" + (await agent.send(session, line)) + "\n");
     } catch (err) {
       // One bad turn shouldn't kill the session.
       console.error("Error:", (err as Error).message, "\n");
