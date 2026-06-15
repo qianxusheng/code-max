@@ -1,12 +1,12 @@
 import type Anthropic from "@anthropic-ai/sdk";
-import type { Kind } from "../policy/permissions.js";
+import type { toolKind } from "../policy/permissions.js";
 
 /** A tool: the spec the model sees + the handler that runs. Kept on one object
  *  so the schema can never drift from the code that executes it. */
 export interface Tool {
   spec: Anthropic.Tool;
   /** Risk class, used by the permission policy: read / edit / exec. */
-  kind: Kind;
+  kind: toolKind;
   run(input: unknown): Promise<string>;
 }
 

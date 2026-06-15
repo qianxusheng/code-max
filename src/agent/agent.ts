@@ -63,7 +63,7 @@ export function createAgent({
         if (!tool) {
           output = `Error: unknown tool "${block.name}"`;
         } else {
-          const decision = session.policy.decide({ name: tool.spec.name, kind: tool.kind });
+          const decision = session.policy.decide({ toolName: tool.spec.name, kind: tool.kind });
           if (decision === "deny") {
             output = `Denied: "${tool.spec.name}" is not permitted in "${session.mode}" mode.`;
           } else {

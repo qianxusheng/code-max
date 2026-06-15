@@ -10,7 +10,7 @@
  */
 
 /** How risky a tool is. `read` never mutates; `edit` writes files; `exec` runs commands. */
-export type Kind = "read" | "edit" | "exec";
+export type toolKind = "read" | "edit" | "exec";
 
 /** The permission profile in effect for a session. */
 export type Mode = "readonly" | "ask" | "auto" | "yolo";
@@ -21,7 +21,7 @@ export type Decision = "allow" | "ask" | "deny";
 /** The minimal description of a pending call the approval UI needs to prompt on. */
 export interface ToolCall {
   name: string;
-  kind: Kind;
+  kind: toolKind;
   input: unknown;
 }
 
@@ -35,27 +35,28 @@ export interface ApproveResult {
 export type Approve = (call: ToolCall) => Promise<ApproveResult>;
 
 // Hardcoded product behavior: which decision each mode gives each tool kind.
-const TABLE: Record<Mode, Record<Kind, Decision>> = {
+const TABLE: Record<Mode, Record<toolKind, Decision>> = {
   readonly: { read: "allow", edit: "deny", exec: "deny" },
   ask: { read: "allow", edit: "ask", exec: "ask" },
   auto: { read: "allow", edit: "allow", exec: "ask" },
   yolo: { read: "allow", edit: "allow", exec: "allow" },
 };
 
-/** A per-session policy: the mode baseline plus a remembered allowlist. */
-export function createPolicy(mode: Mode) {
-  const remembered = new Set<string>();
+/** A per-session approval policy: the mode baseline plus a remembered allowlist. */
+export class ApprovalPolicy {
+  private readonly remembered = new Set<string>();
 
-  return {
-    decide({ name, kind }: { name: string; kind: Kind }): Decision {
-      // (future) user allow/deny rules would be checked here first.
-      if (remembered.has(name)) return "allow";
-      return TABLE[mode][kind];
-    },
-    remember(name: string): void {
-      remembered.add(name);
-    },
-  };
+  constructor(private readonly mode: Mode) {}
+
+  decide({ toolName, kind }: { toolName: string; kind: toolKind }): Decision {
+    // (future) user allow/deny rules would be checked here first.
+    if (this.remembered.has(toolName)) return "allow";
+    return TABLE[this.mode][kind];
+  }
+
+  remember(name: string): void {
+    this.remembered.add(name);
+  }
 }
 
 /** Default approval when no interactive UI is wired: deny anything that asks. */
